@@ -1,6 +1,5 @@
 import tensorflow as tf
 import random
-from src.utils import display_image, create_label_mask
 
 
 class DataLoader(object):
@@ -94,7 +93,7 @@ class DataLoader(object):
 
         return images, one_hot_map
 
-    def data_batch(self, batch_size, one_hot_encode=True, shuffle=10, augmentation=False):
+    def data_batch(self, shuffle, batch_size, one_hot_encode=True, augmentation=False):
         """
         Reads data, normalizes it, shuffles it, then batches it, returns a
         the next element in dataset op and the dataset initializer op.
@@ -131,21 +130,6 @@ class DataLoader(object):
 
         if shuffle:
             data = data.shuffle(shuffle)
-        data = data.batch(batch_size).repeat()
+        data = data.batch(batch_size, drop_remainder=True).repeat()
         data = data.prefetch(tf.data.experimental.AUTOTUNE)
         return data
-
-
-train_dataset = DataLoader(tf_records_path="TFRecords/images.tfrecords")
-train_dataset = train_dataset.data_batch(batch_size=100, shuffle=10, augmentation=True)
-
-for image, mask in train_dataset.take(3):
-    display_image([image[0], create_label_mask(mask[0])])
-"""""
-validation_dataset = DataLoader(image_paths=test_images,
-                                mask_paths=test_images_label,
-                                image_sizes=[[256, 256], [256, 256]],
-                                palette=[0, 1])
-
-validation_dataset = validation_dataset.data_batch(batch_size=1)
-"""""

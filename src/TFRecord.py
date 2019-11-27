@@ -1,18 +1,33 @@
 import tensorflow as tf
-from src.utils import get_images
+from src.utils import get_images, get_mask_paths
+import random
 
-IMAGE_PATH = "C:\\Users\\aless\\OneDrive\\Desktop\\DATASET\\cable_rect_smaller\\normal"
-LABEL_PATH = "C:\\Users\\aless\\OneDrive\\Desktop\\DATASET\\cable_rect_smaller\\label"
+IMAGE_PATH = "file/input/normal"
 
 images = get_images(IMAGE_PATH)
-labels = get_images(LABEL_PATH)
 
 
 class TFRecordEncoder(object):
 
-    def __init__(self, images_paths, mask_paths):
-        self.images_paths = images_paths
-        self.mask_paths = mask_paths
+    def __init__(self, images_paths, train_record_file, validation_record_file, perc_train):
+        self.train_record_file = train_record_file
+        self.validation_record_file = validation_record_file
+        self.perc_train = perc_train
+        self.dataset_size = len(images_paths)
+        self.train_images_paths, self.validation_images_paths = self.get_train_validation_split(images_paths)
+        self.train_mask_paths = get_mask_paths(self.train_images_paths)
+        self.validation_mask_paths = get_mask_paths(self.validation_images_paths)
+
+    def get_train_validation_split(self, images_path):
+        training = []
+        validation = []
+        random.shuffle(images_path)
+        train_size = int(self.perc_train * self.dataset_size)
+        for i in range(0, train_size):
+            training.append(images_path[i])
+        for i in range(train_size, self.dataset_size):
+            validation.append(images_path[i])
+        return training, validation
 
     @staticmethod
     def _bytes_feature(value):
@@ -45,21 +60,21 @@ class TFRecordEncoder(object):
         return tf.train.Example(features=tf.train.Features(feature=feature))
 
     def tf_record_writer(self):
-        record_file = 'images.tfrecords'
-        with tf.io.TFRecordWriter(record_file) as writer:
-            for image, mask in zip(self.images_paths, self.mask_paths):
+        train_record_file = self.train_record_file
+        validation_record_file = self.validation_record_file
+        with tf.io.TFRecordWriter(train_record_file) as writer:
+            for image, mask in zip(self.train_images_paths, self.train_mask_paths):
                 tf_example = self._tf_record_example(image, mask)
                 writer.write(tf_example.SerializeToString())
-
+        with tf.io.TFRecordWriter(validation_record_file) as writer:
+            for image, mask in zip(self.validation_images_paths, self.validation_mask_paths):
+                tf_example = self._tf_record_example(image, mask)
+                writer.write(tf_example.SerializeToString())
         return
 
-    def get_some(self):
-        img_path = self.images_paths[0]
-        lbl_path = self.mask_paths[0]
-        for line in str(self._tf_record_example(img_path, lbl_path)).split('\n')[:15]:
-            print(line)
-        print('...')
 
+record_encoder = TFRecordEncoder(images, 'TFRecords/training.record', 'TFRecords/validation.record', 0.8)
+record_encoder.tf_record_writer()
 
 """""
 class TFRecordDecoder(object):
