@@ -144,26 +144,25 @@ class Decoder(tf.keras.Model):
         # First Upsampling block
 
         x = self.conv_10(input_tensor, training=training)
-        x = self.conv_11(x, training=training)
         x = self.up_1(x, skip_connections[3])
 
         # Second Upsampling block
 
+        x = self.conv_11(x, training=training)
         x = self.conv_12(x, training=training)
-        x = self.conv_13(x, training=training)
         x = self.up_2(x, skip_connections[2])
 
         # Third Upsampling block
 
+        x = self.conv_13(x, training=training)
         x = self.conv_14(x, training=training)
-        x = self.conv_15(x, training=training)
         x = self.up_3(x, skip_connections[1])
 
         # Fourth Upsampling block
 
+        x = self.conv_15(x, training=training)
         x = self.conv_16(x, training=training)
-        x = self.conv_17(x, training=training)
-        x = self.up_4(x, skip_connections[1])
+        x = self.up_4(x, skip_connections[0])
 
         # Final Block
 

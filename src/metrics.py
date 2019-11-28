@@ -2,23 +2,24 @@ import tensorflow as tf
 
 
 def true_positives(predictions, labels):
-    return tf.count_nonzero(predictions * labels, dtype=tf.float32)
+    return tf.math.count_nonzero(predictions * labels, dtype=tf.float32)
 
 
 def true_negatives(predictions, labels):
-    return tf.count_nonzero((predictions - 1) * (labels - 1), dtype=tf.float32)
+    return tf.math.count_nonzero((predictions - 1) * (labels - 1), dtype=tf.float32)
 
 
 def false_positives(predictions, labels):
-    return tf.count_nonzero(predictions * (labels - 1), dtype=tf.float32)
+    return tf.math.count_nonzero(predictions * (labels - 1), dtype=tf.float32)
 
 
 def false_negatives(predictions, labels):
-    return tf.count_nonzero((predictions - 1) * labels, dtype=tf.float32)
+    return tf.math.count_nonzero((predictions - 1) * labels, dtype=tf.float32)
 
 
 def compute_accuracy(logits, labels):
     predictions = tf.cast(tf.argmax(tf.nn.softmax(logits), axis=-1), tf.float32)
+    # labels = tf.cast(tf.argmax(tf.nn.softmax(labels), axis=-1), tf.float32)
     tp = true_positives(predictions, labels)
     tn = true_negatives(predictions, labels)
     fp = false_positives(predictions, labels)
@@ -31,8 +32,8 @@ def compute_accuracy(logits, labels):
 
 
 def precision_recall(logits, labels):
-    predictions = tf.cast(
-        tf.argmax(tf.nn.softmax(logits), axis=-1), tf.float32)
+    predictions = tf.cast(tf.argmax(tf.nn.softmax(logits), axis=-1), tf.float32)
+    # labels = tf.cast(tf.argmax(tf.nn.softmax(labels), axis=-1), tf.float32)
 
     tp = true_positives(predictions, labels)
     fp = false_positives(predictions, labels)

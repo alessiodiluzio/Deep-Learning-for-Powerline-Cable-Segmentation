@@ -48,4 +48,4 @@ def read_pixel_frequency(file_path):
                 perc_black = line.split('=')[1]
             if 'WHITE' in line :
                 perc_white = line.split('=')[1]
-    return perc_black, perc_white
+    return float(perc_black), float(perc_white)

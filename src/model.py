@@ -3,6 +3,7 @@ from src.unet import Encoder
 from src.unet import Decoder
 from src.metrics import precision_recall, compute_accuracy, compute_f1score
 from src.utils import read_pixel_frequency
+from src.utils import display_image, create_label_mask
 import os
 
 
@@ -28,7 +29,7 @@ class UnetModel(tf.keras.Model):
 
     @property
     def saver(self):
-        return tf.train.Saver(self.variables)
+        return tf.compat.v1.train.Saver(self.variables)
 
     @property
     def is_built(self):
@@ -55,7 +56,7 @@ class UnetModel(tf.keras.Model):
 
     def compute_cross_entropy(self, image, one_hot_label, training=True):
         logits = self.forward(image, training=training)
-        cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(labels=one_hot_label, logits=logits)
+        cross_entropy = tf.compat.v1.nn.softmax_cross_entropy_with_logits_v2(labels=one_hot_label, logits=logits)
         if training:
             class_weights = tf.constant([[[[1/self.BLACK_PERCENTUAL, 1/self.WHITE_PERCENTUAL]]]])
             weights = tf.reduce_sum(class_weights * one_hot_label, axis=-1)
@@ -82,8 +83,7 @@ class UnetModel(tf.keras.Model):
         if self.is_built:
             self.saver.save(sess=sess, save_path=self.checkpoint_dir)
         else:
-            raise RuntimeError("You must build the model "
-                               "before save model's variables.")
+            raise RuntimeError("You must build the model before save model's variables.")
 
     def train(self, train_dataset, val_dataset, optimizer, train_steps, val_steps, epochs=50):
 
@@ -106,13 +106,12 @@ class UnetModel(tf.keras.Model):
             train_progbar = tf.keras.utils.Progbar(train_steps)
 
             for b, (image, mask) in enumerate(train_dataset):
-                # labels = tf.squeeze(labels, axis=-1)
-                # onehot_labels = tf.one_hot(indices=labels, depth=2, dtype=tf.float32)
-                # labels = tf.cast(labels, tf.float32)
-                loss, grads = self.backward(image, mask)
+                mask = tf.squeeze(mask, axis=-1)
+                one_hot_labels = tf.one_hot(indices=mask, depth=2, dtype=tf.float32)
+                mask = tf.cast(mask, tf.float32)
+                loss, grads = self.backward(image, one_hot_labels)
                 optimizer.apply_gradients(grads, global_step)
-                logits = self.forward(image, mask, training=False)
-
+                logits = self.forward(image, training=False)
                 precision, recall = precision_recall(logits, mask)
                 f1score = compute_f1score(precision, recall)
                 accuracy = compute_accuracy(logits, mask)
@@ -122,20 +121,19 @@ class UnetModel(tf.keras.Model):
                 metrics = [('loss', loss), ("f1", f1score), ("accuracy", accuracy)]
                 train_progbar.update(b + 1, metrics)
 
-            print("VALIDATION")
             val_loss = tf.metrics.Mean('val_loss')
             val_f1score = tf.metrics.Mean('val_f1')
             val_accuracy = tf.metrics.Mean('val_acc')
 
             val_progbar = tf.keras.utils.Progbar(val_steps)
-
+            print("\nVALIDATION")
             for b, (image, mask) in enumerate(val_dataset):
-                # labels = tf.squeeze(labels, axis=-1)
-                # onehot_labels = tf.one_hot(indices=labels, depth=2, dtype=tf.float32)
-                # labels = tf.cast(labels, tf.float32)
+                mask = tf.squeeze(mask, axis=-1)
+                one_hot_labels = tf.one_hot(indices=mask, depth=2, dtype=tf.float32)
+                mask = tf.cast(mask, tf.float32)
 
-                loss = self.compute_cross_entropy(image, mask, training=False)
-                logits = self.forward(image, mask, training=False)
+                loss = self.compute_cross_entropy(image, one_hot_labels, training=False)
+                logits = self.forward(image, training=False)
 
                 precision, recall = precision_recall(logits, mask)
                 f1score = compute_f1score(precision, recall)
@@ -145,6 +143,13 @@ class UnetModel(tf.keras.Model):
                 val_accuracy(accuracy)
                 metrics = [('val_loss', loss), ("val_f1", f1score), ("val_acc", accuracy)]
                 val_progbar.update(b + 1, metrics)
+            i = 0
+            for b, (image, mask) in enumerate(val_dataset):
+                if i >= 2:
+                    break
+                logits = self.forward(image, training=False)
+                display_image([image[0], mask[0], create_label_mask(logits[0])])
+                i += 1
 
             self.history['train_loss'].append(train_loss.result().numpy())
             self.history['val_loss'].append(val_loss.result().numpy())
