@@ -179,11 +179,11 @@ class UnetModel(tf.keras.Model):
         progbar = tf.keras.utils.Progbar(steps)
 
         for b, (image, mask) in enumerate(test_dataset):
-            # labels = tf.cast(tf.squeeze(labels, axis=-1), tf.float32)
-            logits = self.forward(image, mask, training=False)
+            labels = tf.cast(tf.squeeze(mask, axis=-1), tf.float32)
+            logits = self.forward(image, training=False)
 
-            precision, recall = self.precision_recall(logits, mask)
-            accuracy = self.accuracy(logits, mask)
+            precision, recall = self.precision_recall(logits, labels)
+            accuracy = self.accuracy(logits, labels)
             f1score = self.f1score(precision, recall)
 
             precision_mean(precision)
