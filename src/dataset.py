@@ -33,7 +33,6 @@ class DataLoader(object):
         images = tf.io.decode_png(image_raw, channels=self.channels[0])
         mask_raw = image_features['mask_raw']
         masks = tf.io.decode_png(mask_raw, 1)
-        print("DS", masks.shape)
         images, masks = self._resize_data(images, masks)
         images, masks = self._normalize(images, masks)
         masks = tf.cast(masks, tf.int32)
@@ -45,7 +44,6 @@ class DataLoader(object):
         """
         images = tf.image.resize(images, [self.image_size[0][0], self.image_size[0][1]])
         masks = tf.image.resize(masks, [self.image_size[1][0], self.image_size[1][1]], method='nearest')
-        print("RS ",masks.shape)
         return images, masks
 
     @staticmethod

@@ -3,7 +3,7 @@ from src.unet import Encoder
 from src.unet import Decoder
 from src.metrics import precision_recall, compute_accuracy, compute_f1score
 from src.utils import read_pixel_frequency
-from src.utils import display_image, create_label_mask
+from src.utils import display_image, create_label_mask, plot
 import os
 
 
@@ -85,7 +85,7 @@ class UnetModel(tf.keras.Model):
         else:
             raise RuntimeError("You must build the model before save model's variables.")
 
-    def train(self, train_dataset, val_dataset, optimizer, train_steps, val_steps, epochs=50):
+    def train(self, train_dataset, val_dataset, optimizer, train_steps, val_steps, plot_path, epochs=50):
 
         if tf.executing_eagerly() is False:
             raise RuntimeError("train method must be run only with eager execution.")
@@ -143,6 +143,7 @@ class UnetModel(tf.keras.Model):
                 val_accuracy(accuracy)
                 metrics = [('val_loss', loss), ("val_f1", f1score), ("val_acc", accuracy)]
                 val_progbar.update(b + 1, metrics)
+
             i = 0
             for b, (image, mask) in enumerate(val_dataset):
                 if i >= 2:
@@ -152,17 +153,19 @@ class UnetModel(tf.keras.Model):
                 i += 1
 
             self.history['train_loss'].append(train_loss.result().numpy())
-            self.history['val_loss'].append(val_loss.result().numpy())
             self.history['train_acc'].append(train_accuracy.result().numpy())
-
             self.history['train_f1score'].append(train_f1score.result().numpy())
-            self.history['val_f1score'].append(val_f1score.result().numpy())
+
+            self.history['val_loss'].append(val_loss.result().numpy())
             self.history['val_acc'].append(val_accuracy.result().numpy())
+            self.history['val_f1score'].append(val_f1score.result().numpy())
 
             if self.history['val_acc'][-1] >= best_acc:
                 self.save_variables()
-                print("Model saved. f1: {} --> {}".format(best_acc, self.history['val_acc'][-1]))
+                print("Model saved. accuracy : {} --> {}".format(best_acc, self.history['val_acc'][-1]))
                 best_acc = self.history['val_acc'][-1]
+
+        plot(plot_path, 'Unet', self.history, epochs)
 
     def evaluate(self, test_dataset, steps):
         if tf.executing_eagerly() is False:

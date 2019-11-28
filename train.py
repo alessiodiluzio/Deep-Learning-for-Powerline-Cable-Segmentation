@@ -22,7 +22,8 @@ def main(_):
     train_steps = tf_record_count("TFRecords/training.record")/2
     validation_steps = tf_record_count("TFRecords/validation.record")/1
 
-    net.train(train_dataset, validation_dataset, optimizer, 4, 2, epochs=2)
+    net.train(train_dataset=train_dataset, val_dataset=validation_dataset, optimizer=optimizer, train_steps=4,
+              val_steps=2, plot_path='file/plot/', epochs=2)
     sys.exit(0)
 
 
