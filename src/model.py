@@ -1,9 +1,9 @@
 import tensorflow as tf
-from src.unet import Encoder
-from src.unet import Decoder
-from src.metrics import precision_recall, compute_accuracy, compute_f1score
-from src.utils import read_pixel_frequency
-from src.utils import display_image, create_label_mask, plot
+from .unet import Encoder, Decoder
+from .metrics import precision_recall, compute_accuracy, compute_f1score
+from .utils import read_pixel_frequency
+from .utils import display_image, create_label_mask, plot
+from IPython.display import clear_output
 import os
 
 
@@ -97,6 +97,7 @@ class UnetModel(tf.keras.Model):
                         'val_acc': []}
 
         for i in range(epochs):
+            clear_output()
             print("Epoch: {}/{}".format(i + 1, epochs))
 
             train_loss = tf.metrics.Mean('train_loss')

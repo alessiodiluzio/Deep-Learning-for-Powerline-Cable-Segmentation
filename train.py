@@ -1,14 +1,17 @@
+import tensorflow as tf
+import sys
+import tensorflow.python.eager as tfe
 from src.dataset import DataLoader
 from src.utils import tf_record_count
 from src.model import UnetModel
-import tensorflow as tf
-import sys
-tf.executing_eagerly()
 
 
 def main(_):
-    device = 'gpu:0' if tf.test.is_gpu_available else 'cpu:0'
     device = 'cpu:0'
+    num_gpu = tfe.context.num_gpus()
+    if num_gpu > 0:
+        device = 'gpu:0'
+
     net = UnetModel("Unet", device, "checkpoint")
 
     train_dataset = DataLoader(tf_records_path="TFRecords/training.record")
@@ -20,6 +23,7 @@ def main(_):
     optimizer = tf.optimizers.SGD()
 
     train_steps = tf_record_count("TFRecords/training.record")/2
+    print(train_steps)
     validation_steps = tf_record_count("TFRecords/validation.record")/1
 
     net.train(train_dataset=train_dataset, val_dataset=validation_dataset, optimizer=optimizer, train_steps=4,

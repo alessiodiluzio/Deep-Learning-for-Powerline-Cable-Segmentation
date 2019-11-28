@@ -30,7 +30,7 @@ def get_images(path):
 
 
 def tf_record_count(tf_record_path):
-    return sum(1 for _ in tf.compat.v1.io.tf_record_iterator(tf_record_path))
+    return sum(1 for _ in tf.data.TFRecordDataset(tf_record_path))
 
 
 def get_mask_paths(training_paths):

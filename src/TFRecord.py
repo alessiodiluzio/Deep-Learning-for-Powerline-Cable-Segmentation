@@ -1,5 +1,5 @@
 import tensorflow as tf
-from src.utils import get_images, get_mask_paths
+from .utils import get_images, get_mask_paths
 import random
 
 IMAGE_PATH = "file/input/normal"
