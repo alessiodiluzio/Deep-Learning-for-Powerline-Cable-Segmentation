@@ -2,3 +2,6 @@ TFRecords
 .idea
 file/input
 checkpoint
+file/predictions
+file/test
+file/training_predictions

@@ -1,23 +1,29 @@
 import tensorflow as tf
-from .unet import Encoder, Decoder
+from .unet import UEncoder, UDecoder
+from .vgg16_based import Encoder, Decoder
 from .metrics import precision_recall, compute_accuracy, compute_f1score
 from .utils import read_pixel_frequency
-from .utils import display_image, create_label_mask, plot
+from .utils import  plot, save_validation, create_folder_and_save_path, save_test
 from IPython.display import clear_output
 import os
 
 
-class UnetModel(tf.keras.Model):
+class CableModel(tf.keras.Model):
 
     def __init__(self, name, device, checkpoint_dir):
-        super(UnetModel, self).__init__(name="UnetModel")
+        super(CableModel, self).__init__(name=name)
         self._device = device
         self._checkpoint_dir = os.path.join(checkpoint_dir, name)
         self._is_built = False
-        self.encoder = Encoder()
-        self.decoder = Decoder()
+        if name == 'Unet':
+            self.encoder = UEncoder()
+            self.decoder = UDecoder()
+        elif name == 'Vgg16':
+            self.encoder = Encoder()
+            self.decoder = Decoder()
         self.history = {}
         self.BLACK_PERCENTUAL, self.WHITE_PERCENTUAL = read_pixel_frequency('file/WHITE_BLACK_PERCENTUAL.txt')
+
 
     @property
     def device(self):
@@ -48,7 +54,7 @@ class UnetModel(tf.keras.Model):
         return output
 
     def call(self, image, training=False):
-        input_tensor = image  # tf.concat([imgs_1, imgs_2], axis=-1)
+        input_tensor = image
         x = self.encoder(input_tensor, training=training)
         skip_connections = self.encoder.skip_connections
         x = self.decoder(x, training=training, skip_connections=skip_connections)
@@ -58,28 +64,45 @@ class UnetModel(tf.keras.Model):
         logits = self.forward(image, training=training)
         cross_entropy = tf.compat.v1.nn.softmax_cross_entropy_with_logits_v2(labels=one_hot_label, logits=logits)
         if training:
-            class_weights = tf.constant([[[[1/self.BLACK_PERCENTUAL, 1/self.WHITE_PERCENTUAL]]]])
+            class_weights = tf.constant([[[[1.0/self.BLACK_PERCENTUAL, 1.0/self.WHITE_PERCENTUAL]]]])
             weights = tf.reduce_sum(class_weights * one_hot_label, axis=-1)
             weighted_loss = tf.reduce_mean(cross_entropy * weights)
             return weighted_loss
         return cross_entropy
 
+    def class_balanced_loss(self, image, one_hot_label, training=True):
+        beta = self.WHITE_PERCENTUAL
+        logits = self.forward(image, training=training)
+        logits = tf.nn.sigmoid(logits)
+        one_prob = one_hot_label * logits
+        zero_prob = -1*(one_hot_label - 1) * (1 - logits)
+        one_prob = tf.where(tf.equal(one_prob, 0), tf.ones_like(one_prob), one_prob)
+        zero_prob = tf.where(tf.equal(zero_prob, 0), tf.ones_like(zero_prob), zero_prob)
+        return (- beta * tf.math.reduce_sum(tf.math.log(one_prob)) - (1 - beta) * tf.math.reduce_sum(tf.math.log(zero_prob)))/float(image.shape[1]*image.shape[2])
+
     def backward(self, image, one_hot_label):
         with tf.device(self.device):
             with tf.GradientTape() as tape:
-                loss = self.compute_cross_entropy(image, one_hot_label, training=True)
-            gradients = tape.gradient(loss, self.variables)
-            grad_vars = zip(gradients, self.variables)
+                loss = self.class_balanced_loss(image, one_hot_label)
+            gradients = tape.gradient(loss, self.trainable_variables)
+            grad_vars = zip(gradients, self.trainable_variables)
             return loss, grad_vars
 
-    def load_variables(self, sess=None):
+    def load_variables(self, sess=None, num_bands=3):
+        """"
+        Function to restore trained model.
+        """
+
         if self.is_built is False:
             # Run the model once to initialize variables
-            dummy_image = tf.zeros((1, 256, 256, 3))
-            self.forward(dummy_image, training=False)
-            self.saver.restore(sess=sess, save_path=self.checkpoint_dir)
+            image = tf.zeros((1, 128, 128, num_bands))
+            self.forward(image,  training=False)
+        self.saver.restore(sess=sess, save_path=self.checkpoint_dir)
 
     def save_variables(self, sess=None):
+        """
+        Function to save trained model.
+        """
         if self.is_built:
             self.saver.save(sess=sess, save_path=self.checkpoint_dir)
         else:
@@ -90,13 +113,14 @@ class UnetModel(tf.keras.Model):
         if tf.executing_eagerly() is False:
             raise RuntimeError("train method must be run only with eager execution.")
         global_step = tf.compat.v1.train.get_or_create_global_step()
-        # best_f1score = 0
-        best_acc = 0
+        best_f1score = 0
+
         # Initialize dictionary to store the history
         self.history = {'train_loss': [], 'val_loss': [], 'train_f1score': [], 'val_f1score': [], 'train_acc': [],
                         'val_acc': []}
-
+        save_path = create_folder_and_save_path('file/training_predictions/',  self.name, split=False)
         for i in range(epochs):
+            epoca = i
             clear_output()
             print("Epoch: {}/{}".format(i + 1, epochs))
 
@@ -107,6 +131,7 @@ class UnetModel(tf.keras.Model):
             train_progbar = tf.keras.utils.Progbar(train_steps)
 
             for b, (image, mask) in enumerate(train_dataset):
+
                 mask = tf.squeeze(mask, axis=-1)
                 one_hot_labels = tf.one_hot(indices=mask, depth=2, dtype=tf.float32)
                 mask = tf.cast(mask, tf.float32)
@@ -129,11 +154,13 @@ class UnetModel(tf.keras.Model):
             val_progbar = tf.keras.utils.Progbar(val_steps)
             print("\nVALIDATION")
             for b, (image, mask) in enumerate(val_dataset):
+
                 mask = tf.squeeze(mask, axis=-1)
                 one_hot_labels = tf.one_hot(indices=mask, depth=2, dtype=tf.float32)
                 mask = tf.cast(mask, tf.float32)
 
-                loss = self.compute_cross_entropy(image, one_hot_labels, training=False)
+                # loss = self.compute_cross_entropy(image, one_hot_labels, training=False)
+                loss = self.class_balanced_loss(image, one_hot_labels, training=False)
                 logits = self.forward(image, training=False)
 
                 precision, recall = precision_recall(logits, mask)
@@ -145,13 +172,12 @@ class UnetModel(tf.keras.Model):
                 metrics = [('val_loss', loss), ("val_f1", f1score), ("val_acc", accuracy)]
                 val_progbar.update(b + 1, metrics)
 
-            i = 0
             for b, (image, mask) in enumerate(val_dataset):
-                if i >= 2:
+                if b >= 3:
                     break
                 logits = self.forward(image, training=False)
-                display_image([image[0], mask[0], create_label_mask(logits[0])])
-                i += 1
+                save_validation(image[0], mask[0], logits[0], save_path, '_epoch_' + str(epoca + 1) + '_' + str(j))
+
 
             self.history['train_loss'].append(train_loss.result().numpy())
             self.history['train_acc'].append(train_accuracy.result().numpy())
@@ -161,12 +187,27 @@ class UnetModel(tf.keras.Model):
             self.history['val_acc'].append(val_accuracy.result().numpy())
             self.history['val_f1score'].append(val_f1score.result().numpy())
 
-            if self.history['val_acc'][-1] >= best_acc:
+            if self.history['val_f1score'][-1] >= best_f1score:
                 self.save_variables()
-                print("Model saved. accuracy : {} --> {}".format(best_acc, self.history['val_acc'][-1]))
-                best_acc = self.history['val_acc'][-1]
+                print("Model saved. f1score : {} --> {}".format(best_f1score, self.history['val_f1score'][-1]))
+                best_f1score = self.history['val_f1score'][-1]
 
-        plot(plot_path, 'Unet', self.history, epochs)
+        plot(plot_path, self.name, self.history, epochs)
+
+    def test(self, test_dataset, steps):
+        if tf.executing_eagerly() is False:
+            raise RuntimeError("evaluate method must be run only with eager execution.")
+        self.load_variables()
+        progbar = tf.keras.utils.Progbar(steps)
+        save_path = create_folder_and_save_path('file/test/', self.name, split=False)
+        count = 0
+        for b, (image) in enumerate(test_dataset):
+
+            logits = self.forward(image, training=False)
+            for i in range(0, len(image)):
+                save_test(image[i], logits[i], save_path, count)
+            progbar.update(b + 1)
+            count = count + 1
 
     def evaluate(self, test_dataset, steps):
         if tf.executing_eagerly() is False:
@@ -177,15 +218,19 @@ class UnetModel(tf.keras.Model):
         accuracy_mean = tf.metrics.Mean('accuracy')
         f1score_mean = tf.metrics.Mean('f1score')
         progbar = tf.keras.utils.Progbar(steps)
-
+        save_path = create_folder_and_save_path('file/predictions/', self.name, split=False)
+        count = 0
         for b, (image, mask) in enumerate(test_dataset):
             labels = tf.cast(tf.squeeze(mask, axis=-1), tf.float32)
             logits = self.forward(image, training=False)
 
-            precision, recall = self.precision_recall(logits, labels)
-            accuracy = self.accuracy(logits, labels)
-            f1score = self.f1score(precision, recall)
-
+            precision, recall = precision_recall(logits, labels)
+            accuracy = compute_accuracy(logits, labels)
+            f1score = compute_f1score(precision, recall)
+            count += 1
+            if count < 50:
+                for i in range(0, int(len(image) / 10)):
+                    save_validation(image[i], mask[i], logits[i], save_path, count)
             precision_mean(precision)
             recall_mean(recall)
             accuracy_mean(accuracy)

@@ -8,15 +8,17 @@ class Conv2DLayer(tf.keras.Model):
         self.convolution = tf.keras.layers.Conv2D(filters=filters, kernel_size=kernel_size, strides=strides,
                                                   padding=padding, activation=activation,
                                                   kernel_initializer=kernel_initializer)
+        self.batch_normalization = tf.keras.layers.BatchNormalization(axis=-1)
 
     def __call__(self, input_tensor, training=False):
         x = self.convolution(input_tensor)
+        x = self.batch_normalization(x, training=training)
         return tf.nn.relu(x)
 
 
-class Encoder(tf.keras.Model):
+class UEncoder(tf.keras.Model):
     def __init__(self):
-        super(Encoder, self).__init__(name='Encoder')
+        super(UEncoder, self).__init__(name='Encoder')
 
         self.conv_1 = Conv2DLayer(filters=64, kernel_size=3, strides=1, padding='same',
                                   activation=None, kernel_initializer="he_normal")
@@ -103,10 +105,10 @@ class SkipConnection(tf.keras.Model):
         return x
 
 
-class Decoder(tf.keras.Model):
+class UDecoder(tf.keras.Model):
 
     def __init__(self):
-        super(Decoder, self).__init__(name='Decoder')
+        super(UDecoder, self).__init__(name='Decoder')
 
         self.conv_10 = Conv2DLayer(filters=512,  kernel_size=3, strides=1, padding='same',
                                    activation=None, kernel_initializer="he_normal")
@@ -135,7 +137,8 @@ class Decoder(tf.keras.Model):
         self.conv_18 = Conv2DLayer(filters=64, kernel_size=3, strides=1, padding='same',
                                    activation=None, kernel_initializer="he_normal")
 
-        self.final_conv = tf.keras.layers.Conv2D(filters=2, kernel_size=1, strides=1, padding='same', activation=None)
+        self.final_conv = tf.keras.layers.Conv2D(filters=2, kernel_size=1, strides=1, padding='same',
+                                                 activation=None) #, kernel_initializer="he_normal"
         # Conv2DLayer(filters=2,  kernel_size=1, strides=1, padding='same',
         # activation=None, kernel_initializer="he_normal")
 

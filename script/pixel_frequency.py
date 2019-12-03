@@ -1,6 +1,9 @@
+import tensorflow as tf
 from PIL import Image
 from src.utils import get_images
-IMAGE_PATH = "../file/input/label"
+from src.dataset import DataLoader
+LABEL_PATH = ['../file/input/label/cable_blank', '../file/input/label/cable_depth',
+              '../file/input/label/cable_horizontal', '../file/input/label/cable_rect']
 
 
 def pixel_frequency(training_images_label):
@@ -21,8 +24,8 @@ def pixel_frequency(training_images_label):
     return perc_black, perc_white
 
 
-def write_pixel_frequency(file_path):
-    training_images = get_images(IMAGE_PATH)
+
+def write_pixel_frequency(file_path, training_images):
     perc_black, perc_white = pixel_frequency(training_images)
     with open(file_path, 'w') as file:
         line_1 = "WHITE=" + str(perc_white) + '\n'
@@ -31,4 +34,5 @@ def write_pixel_frequency(file_path):
         file.write(line_2)
 
 
-write_pixel_frequency('../file/WHITE_BLACK_PERCENTUAL.txt')
+
+

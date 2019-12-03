@@ -10,22 +10,31 @@ def create_label_mask(label_mask):
     return label_mask
 
 
-def display_image(display_list):
-    plt.figure(figsize=(30, 30))
+def display_image(display_list, epoch):
+    plt.figure(num='Epoch ' + str(epoch), figsize=(30, 30))
     title = ['Image', 'Mask', "Predicted Mask"]
     for i in range(len(display_list)):
         plt.subplot(1, len(display_list), i + 1)
         plt.title(title[i])
         plt.imshow(tf.keras.preprocessing.image.array_to_img(display_list[i]))
         plt.axis('off')
-    plt.show()
+    plt.pause(0.001)
+    plt.show(block=False)
 
 
-def get_images(path):
+def get_images(path_list, perc=1):
     array = []
-    for r, d, images in os.walk(path):
-        for img in images:
-            array.append(os.path.join(r, img))
+    if not isinstance(path_list, list):
+        path_list = [path_list]
+    for path in path_list:
+        for r, d, images in os.walk(path):
+            tot = int(perc * len(images))
+            saved = 0
+            for img in images:
+                saved += 1
+                array.append(os.path.join(r, img))
+                if saved > tot:
+                    break
     return array
 
 
@@ -52,46 +61,91 @@ def read_pixel_frequency(file_path):
     return float(perc_black), float(perc_white)
 
 
-def plot_metrics(model_history, epochs, save_path, validation=False):
+def get_val_metric(metric, val_metrics):
+    metric_tmp = metric.split('_')[1]
+    for m in val_metrics:
+        if metric_tmp in m:
+            return m
+
+
+def plot_metrics(model_history, epochs, save_path):
     epochs = range(epochs)
-    metrics = []
+    train_metrics = []
+    val_metrics = []
     for key in model_history:
-        if validation:
-            if 'val' in key:
-                metrics.append(key)
+        if 'val' in key:
+            train_metrics.append(key)
         else:
-            if 'val' not in key:
-                metrics.append(key)
-    for i in range(0, len(metrics)):
-        metric = metrics[i]
-        m = model_history[metric]
-        label = 'Training'
-        if validation:
-            label = 'Validation'
+            val_metrics.append(key)
+    for metric in train_metrics:
+        mv = model_history[get_val_metric(metric, val_metrics)]
+        mt = model_history[metric]
+        labelt = 'Training'
+        labelv = 'Validation'
         plt.figure()
-        color = 'red'
-        if validation:
-            color = 'blue'
-        plt.plot(epochs, m, color=color, linestyle='-', label=label + ' ' + metric)
-        plt.title(label + " " + metric)
+        colorv = 'red'
+        colort = 'blue'
+        plt.plot(epochs, mt, color=colort, linestyle='-', label=labelt + ' ' + metric)
+        plt.plot(epochs, mv, color=colorv, linestyle='-', label=labelv + ' ' + metric)
+        plt.title(metric)
         plt.xlabel('Epoch')
         plt.ylabel(metric+' Value')
-        plt.ylim([0, 2])
+        plt.ylim([0, 1])
         plt.legend()
-        plt.savefig(os.path.join(save_path, label + '_' + metric + '.jpg'))
-        plt.show()
+        plt.savefig(os.path.join(save_path, metric + '.jpg'))
+        plt.pause(0.001)
+        plt.show(block=False)
+        plt.close()
 
 
-def create_folder_and_save_path(dir_path, model_name):
+def create_folder_and_save_path(dir_path, model_name, split=True):
     folder_name = model_name + "_" + str(datetime.datetime.now()).replace(':', '_')
     folder_path = dir_path + folder_name
     os.mkdir(folder_path)
-    os.mkdir(folder_path + '/Training')
-    os.mkdir(folder_path + '/Validation')
+    if split:
+        os.mkdir(folder_path + '/Training')
+        os.mkdir(folder_path + '/Validation')
+    print("CREATE ", folder_path)
     return folder_path
 
 
 def plot(dir_path, model_name, model_history, epochs,):
     save_path = create_folder_and_save_path(dir_path, model_name)
-    plot_metrics(model_history, epochs, save_path + '/Training', validation=False)
-    plot_metrics(model_history, epochs, save_path + '/Validation', validation=True)
+    plot_metrics(model_history, epochs, save_path )
+
+
+def save_test(image, logit, path, index):
+    logit = tf.squeeze(create_label_mask(logit), axis=-1)
+    plt.figure(num='Number ' + str(index), figsize=(30, 30))
+    plt.subplot(1, 2, 1)
+    plt.title('Image')
+    plt.imshow(image)
+    plt.axis('off')
+    plt.subplot(1, 2, 2)
+    plt.title('Prediction')
+    plt.imshow(logit)
+    plt.axis('off')
+    plt.savefig(os.path.join(path, 'test_' + str(index) + '.png'))
+    plt.close()
+
+
+def save_validation(image, mask, logit, path, index):
+    logit = tf.squeeze(create_label_mask(logit), axis=-1)
+    plt.figure(num='Number ' + str(index), figsize=(30, 30))
+    plt.subplot(1, 3, 1)
+    plt.title('Image')
+    plt.imshow(image)
+    plt.axis('off')
+    plt.subplot(1, 3, 2)
+    plt.title('True Mask')
+    plt.imshow(tf.keras.preprocessing.image.array_to_img(mask))
+    plt.axis('off')
+    plt.subplot(1, 3, 3)
+    plt.title('Prediction')
+    plt.imshow(logit)
+    plt.axis('off')
+    plt.savefig(os.path.join(path, 'prediction_' + str(index) + '.png'))
+    plt.close()
+    #img = tf.keras.preprocessing.image.array_to_img(save_image)
+    #img.save(os.path.join(path, 'prediction_' + index + '.png'))
+

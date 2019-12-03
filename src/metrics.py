@@ -19,7 +19,7 @@ def false_negatives(predictions, labels):
 
 def compute_accuracy(logits, labels):
     predictions = tf.cast(tf.argmax(tf.nn.softmax(logits), axis=-1), tf.float32)
-    # labels = tf.cast(tf.argmax(tf.nn.softmax(labels), axis=-1), tf.float32)
+
     tp = true_positives(predictions, labels)
     tn = true_negatives(predictions, labels)
     fp = false_positives(predictions, labels)
@@ -33,7 +33,6 @@ def compute_accuracy(logits, labels):
 
 def precision_recall(logits, labels):
     predictions = tf.cast(tf.argmax(tf.nn.softmax(logits), axis=-1), tf.float32)
-    # labels = tf.cast(tf.argmax(tf.nn.softmax(labels), axis=-1), tf.float32)
 
     tp = true_positives(predictions, labels)
     fp = false_positives(predictions, labels)
