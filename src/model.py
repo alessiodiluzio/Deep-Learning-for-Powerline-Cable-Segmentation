@@ -71,19 +71,20 @@ class CableModel(tf.keras.Model):
         return cross_entropy
 
     def class_balanced_loss(self, image, one_hot_label, training=True):
-        beta = self.WHITE_PERCENTUAL
+        beta = self.BLACK_PERCENTUAL
         logits = self.forward(image, training=training)
         logits = tf.nn.sigmoid(logits)
         one_prob = one_hot_label * logits
         zero_prob = -1*(one_hot_label - 1) * (1 - logits)
         one_prob = tf.where(tf.equal(one_prob, 0), tf.ones_like(one_prob), one_prob)
         zero_prob = tf.where(tf.equal(zero_prob, 0), tf.ones_like(zero_prob), zero_prob)
-        return (- beta * tf.math.reduce_sum(tf.math.log(one_prob)) - (1 - beta) * tf.math.reduce_sum(tf.math.log(zero_prob)))/float(image.shape[1]*image.shape[2])
+        return (- 1.0/beta * tf.math.reduce_sum(tf.math.log(one_prob)) - 1.0/(1 - beta) * tf.math.reduce_sum(tf.math.log(zero_prob)))/float(image.shape[1]*image.shape[2])
 
     def backward(self, image, one_hot_label):
         with tf.device(self.device):
             with tf.GradientTape() as tape:
-                loss = self.class_balanced_loss(image, one_hot_label)
+                loss = self.compute_cross_entropy(image, one_hot_label, training=True)
+                # loss = self.class_balanced_loss(image, one_hot_label)
             gradients = tape.gradient(loss, self.trainable_variables)
             grad_vars = zip(gradients, self.trainable_variables)
             return loss, grad_vars
@@ -159,8 +160,8 @@ class CableModel(tf.keras.Model):
                 one_hot_labels = tf.one_hot(indices=mask, depth=2, dtype=tf.float32)
                 mask = tf.cast(mask, tf.float32)
 
-                # loss = self.compute_cross_entropy(image, one_hot_labels, training=False)
-                loss = self.class_balanced_loss(image, one_hot_labels, training=False)
+                loss = self.compute_cross_entropy(image, one_hot_labels, training=False)
+                # loss = self.class_balanced_loss(image, one_hot_labels, training=False)
                 logits = self.forward(image, training=False)
 
                 precision, recall = precision_recall(logits, mask)
@@ -176,8 +177,7 @@ class CableModel(tf.keras.Model):
                 if b >= 3:
                     break
                 logits = self.forward(image, training=False)
-                save_validation(image[0], mask[0], logits[0], save_path, '_epoch_' + str(epoca + 1) + '_' + str(j))
-
+                save_validation(image[0], mask[0], logits[0], save_path, '_epoch_' + str(epoca + 1) + '_' + str(b))
 
             self.history['train_loss'].append(train_loss.result().numpy())
             self.history['train_acc'].append(train_accuracy.result().numpy())
@@ -202,12 +202,12 @@ class CableModel(tf.keras.Model):
         save_path = create_folder_and_save_path('file/test/', self.name, split=False)
         count = 0
         for b, (image) in enumerate(test_dataset):
-
             logits = self.forward(image, training=False)
-            for i in range(0, len(image)):
-                save_test(image[i], logits[i], save_path, count)
+            for img, lgt in zip(image, logits):
+                save_test(img, lgt, save_path, count)
+                count += 1
             progbar.update(b + 1)
-            count = count + 1
+
 
     def evaluate(self, test_dataset, steps):
         if tf.executing_eagerly() is False:

@@ -119,11 +119,11 @@ class TFRecordEncoderTest(object):
 
 
 
-"""
+
 record_encoder = TFRecordEncoder("../file/input/large/normal", '../TFRecords/large/training_large.record',
                                  '../TFRecords/large/validation_large.record', 0.8)
 record_encoder.tf_record_writer(change_percentual=True)
-"""
+
 
 """
 test_encoder = TFRecordEncoderTest("../file/input/real", '../TFRecords/real/real.record')

@@ -120,6 +120,8 @@ class DataLoader(object):
         if shuffle:
             data = data.shuffle(shuffle)
         data = data.batch(batch_size, drop_remainder=True) # .repeat()
+        if augmentation:
+            data.repeat(2)
         data = data.prefetch(tf.data.experimental.AUTOTUNE)
         return data
 

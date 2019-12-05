@@ -19,7 +19,6 @@ def display_image(display_list, epoch):
         plt.imshow(tf.keras.preprocessing.image.array_to_img(display_list[i]))
         plt.axis('off')
     plt.pause(0.001)
-    plt.show(block=False)
 
 
 def get_images(path_list, perc=1):
@@ -61,10 +60,9 @@ def read_pixel_frequency(file_path):
     return float(perc_black), float(perc_white)
 
 
-def get_val_metric(metric, val_metrics):
-    metric_tmp = metric.split('_')[1]
+def get_val_metric(metric_name, val_metrics):
     for m in val_metrics:
-        if metric_tmp in m:
+        if metric_name in m:
             return m
 
 
@@ -73,28 +71,28 @@ def plot_metrics(model_history, epochs, save_path):
     train_metrics = []
     val_metrics = []
     for key in model_history:
-        if 'val' in key:
+        if 'train' in key:
             train_metrics.append(key)
         else:
             val_metrics.append(key)
     for metric in train_metrics:
-        mv = model_history[get_val_metric(metric, val_metrics)]
+        metric_name = metric.split('_')[1]
+        mv = model_history[get_val_metric(metric_name, val_metrics)]
         mt = model_history[metric]
         labelt = 'Training'
         labelv = 'Validation'
         plt.figure()
         colorv = 'red'
         colort = 'blue'
-        plt.plot(epochs, mt, color=colort, linestyle='-', label=labelt + ' ' + metric)
-        plt.plot(epochs, mv, color=colorv, linestyle='-', label=labelv + ' ' + metric)
-        plt.title(metric)
+        plt.plot(epochs, mt, color=colort, linestyle='-', label=labelt + ' ' + metric_name)
+        plt.plot(epochs, mv, color=colorv, linestyle='-', label=labelv + ' ' + metric_name)
+        plt.title(metric_name)
         plt.xlabel('Epoch')
-        plt.ylabel(metric+' Value')
+        plt.ylabel(metric_name + ' value')
         plt.ylim([0, 1])
         plt.legend()
-        plt.savefig(os.path.join(save_path, metric + '.jpg'))
+        plt.savefig(os.path.join(save_path, metric_name + '_' + epochs + '.jpg'))
         plt.pause(0.001)
-        plt.show(block=False)
         plt.close()
 
 
@@ -110,8 +108,8 @@ def create_folder_and_save_path(dir_path, model_name, split=True):
 
 
 def plot(dir_path, model_name, model_history, epochs,):
-    save_path = create_folder_and_save_path(dir_path, model_name)
-    plot_metrics(model_history, epochs, save_path )
+    save_path = create_folder_and_save_path(dir_path, model_name, split=False)
+    plot_metrics(model_history, epochs, save_path)
 
 
 def save_test(image, logit, path, index):

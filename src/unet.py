@@ -138,7 +138,7 @@ class UDecoder(tf.keras.Model):
                                    activation=None, kernel_initializer="he_normal")
 
         self.final_conv = tf.keras.layers.Conv2D(filters=2, kernel_size=1, strides=1, padding='same',
-                                                 activation=None) #, kernel_initializer="he_normal"
+                                                 activation=None, kernel_initializer="he_normal") #, kernel_initializer="he_normal"
         # Conv2DLayer(filters=2,  kernel_size=1, strides=1, padding='same',
         # activation=None, kernel_initializer="he_normal")
 
