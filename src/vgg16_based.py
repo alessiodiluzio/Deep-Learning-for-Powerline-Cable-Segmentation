@@ -77,19 +77,21 @@ class SkipConnection(tf.keras.Model):
 
 class Decoder(tf.keras.Model):
 
-    def __init__(self):
+    def __init__(self, skips=True):
         super(Decoder, self).__init__(name='Decoder')
 
         self.dil_conv_1 = Conv2DLayer(filters=128, kernel_size=3, strides=1, padding="same", activation='relu',
-                                            kernel_initializer='he_normal')
+                                      kernel_initializer='he_normal')
         self.dil_conv_2 = Conv2DLayer(filters=128, kernel_size=3, strides=1, padding="same", activation='relu',
-                                            kernel_initializer='he_normal',dilation_rate=2)
+                                      kernel_initializer='he_normal',dilation_rate=2)
         self.dil_conv_3 = Conv2DLayer(filters=128, kernel_size=3, strides=1, padding="same", activation='relu',
-                                            kernel_initializer='he_normal',dilation_rate=4)
+                                      kernel_initializer='he_normal',dilation_rate=4)
         self.dil_conv_4 = Conv2DLayer(filters=64, kernel_size=3, strides=1, padding="same", activation='relu',
-                                            kernel_initializer='he_normal')
-
-        self.up_1 = SkipConnection()
+                                      kernel_initializer='he_normal')
+        if skips:
+            self.up_1 = SkipConnection()
+        else:
+            self.up_1 = tf.keras.layers.UpSampling2D(size=(2, 2))
 
         self.conv_4 = Conv2DLayer(filters = 64, kernel_size = 3, strides = 1, padding ="same"
                                   , activation="relu", kernel_initializer='he_normal')
@@ -112,3 +114,49 @@ class Decoder(tf.keras.Model):
         x = self.final_conv(x)
 
         return x
+
+
+class DeepDecoder:
+
+    def __init__(self, skips=True):
+        super(DeepDecoder, self).__init__(name='Decoder')
+
+        self.dil_conv_1 = Conv2DLayer(filters=64, kernel_size=3, strides=1, padding="same", activation='relu',
+                                      kernel_initializer='he_normal')
+        self.dil_conv_2 = Conv2DLayer(filters=128, kernel_size=3, strides=1, padding="same", activation='relu',
+                                      kernel_initializer='he_normal', dilation_rate=2)
+        self.dil_conv_3 = Conv2DLayer(filters=256, kernel_size=3, strides=1, padding="same", activation='relu',
+                                      kernel_initializer='he_normal', dilation_rate=4)
+        self.dil_conv_4 = Conv2DLayer(filters=256, kernel_size=3, strides=1, padding="same", activation='relu',
+                                      kernel_initializer='he_normal', dilation_rate=8)
+        self.dil_conv_5 = Conv2DLayer(filters=128, kernel_size=3, strides=1, padding="same", activation='relu',
+                                      kernel_initializer='he_normal', dilation_rate=16)
+        self.dil_conv_6 = Conv2DLayer(filters=64, kernel_size=3, strides=1, padding="same", activation='relu',
+                                      kernel_initializer='he_normal')
+        if skips:
+            self.up_1 = SkipConnection()
+        else:
+            self.up_1 = tf.keras.layers.UpSampling2D(size=(2, 2))
+
+        self.conv_4 = Conv2DLayer(filters=64, kernel_size=3, strides=1, padding="same"
+                                  , activation="relu", kernel_initializer='he_normal')
+
+        self.final_conv = tf.keras.layers.Conv2D(filters=2, kernel_size=1, strides=1, padding='same', activation=None,
+                                                 kernel_initializer="he_normal")
+
+    def __call__(self, input_tensor, training, skip_connections):
+
+        # First Upsampling block
+
+        x = self.dil_conv_1(input_tensor, training=training)
+        x = self.dil_conv_2(x, training=training)
+        x = self.dil_conv_3(x, training=training)
+        x = self.dil_conv_4(x, training=training)
+        x = self.dil_conv_5(x, training=training)
+        x = self.dil_conv_6(x, training=training)
+        x = self.up_1(x, skip_connections[0])
+        x = self.conv_4(x, training=training)
+        x = self.final_conv(x)
+
+        return x
+

@@ -1,6 +1,6 @@
 import tensorflow as tf
 from .unet import UEncoder, UDecoder
-from .vgg16_based import Encoder, Decoder
+from .vgg16_based import Encoder, Decoder, DeepDecoder
 from .metrics import precision_recall, compute_accuracy, compute_f1score
 from .utils import read_pixel_frequency
 from .utils import  plot, save_validation, create_folder_and_save_path, save_test
@@ -21,6 +21,17 @@ class CableModel(tf.keras.Model):
         elif name == 'Vgg16':
             self.encoder = Encoder()
             self.decoder = Decoder()
+        elif name == 'Vgg16NoSkip':
+            self.encoder = Encoder()
+            self.decoder = Decoder(skips=False)
+        elif name == 'Vgg16Deep':
+            self.encoder = Encoder()
+            self.decoder = DeepDecoder()
+        elif name == 'Vgg16DeepNoSkip':
+            self.encoder = Encoder()
+            self.decoder = DeepDecoder(skips=False)
+        else:
+            raise ValueError("UNKNOWN NET NAME")
         self.history = {}
         self.BLACK_PERCENTUAL, self.WHITE_PERCENTUAL = read_pixel_frequency('file/WHITE_BLACK_PERCENTUAL.txt')
 

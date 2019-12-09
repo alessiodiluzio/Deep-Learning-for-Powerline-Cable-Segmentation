@@ -67,6 +67,7 @@ def get_val_metric(metric_name, val_metrics):
 
 
 def plot_metrics(model_history, epochs, save_path):
+    l_epochs = epochs
     epochs = range(epochs)
     train_metrics = []
     val_metrics = []
@@ -91,7 +92,7 @@ def plot_metrics(model_history, epochs, save_path):
         plt.ylabel(metric_name + ' value')
         plt.ylim([0, 1])
         plt.legend()
-        plt.savefig(os.path.join(save_path, metric_name + '_' + epochs + '.jpg'))
+        plt.savefig(os.path.join(save_path, metric_name + '_' + str(l_epochs) + '.jpg'))
         plt.pause(0.001)
         plt.close()
 
