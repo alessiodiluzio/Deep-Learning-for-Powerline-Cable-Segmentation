@@ -6,8 +6,9 @@ import random
 
 class TFRecordEncoder(object):
 
-    def __init__(self, images_path, train_record_file, validation_record_file, perc_train):
-        self.train_images_paths = get_images(images_path)
+    def __init__(self, images_path, train_record_file, validation_record_file, perc_train, perc_dataset=1):
+        self.train_images_paths = get_images(images_path, perc_dataset)
+        print(self.train_images_paths)
         random.shuffle(self.train_images_paths)
         self.train_record_file = train_record_file
         self.validation_record_file = validation_record_file
@@ -121,11 +122,7 @@ class TFRecordEncoderTest(object):
 
 
 record_encoder = TFRecordEncoder("../file/input/large/normal", '../TFRecords/large/training_large.record',
-                                 '../TFRecords/large/validation_large.record', 0.8)
+                                 '../TFRecords/large/validation_large.record', 0.8, 1)
 record_encoder.tf_record_writer(change_percentual=True)
-
-
-"""
-test_encoder = TFRecordEncoderTest("../file/input/real", '../TFRecords/real/real.record')
-test_encoder.tf_record_writer()
-"""
+#test_encoder = TFRecordEncoderTest("../file/input/real_video", '../TFRecords/real_video/real_video.record')
+#test_encoder.tf_record_writer()

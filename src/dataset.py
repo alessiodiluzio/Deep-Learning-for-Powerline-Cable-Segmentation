@@ -1,5 +1,7 @@
+from PIL import Image, ImageEnhance
 import tensorflow as tf
 import random
+import numpy as np
 
 
 class DataLoader(object):
@@ -33,6 +35,10 @@ class DataLoader(object):
         images = tf.io.decode_png(image_raw, channels=self.channels[0])
         mask_raw = image_features['mask_raw']
         masks = tf.io.decode_png(mask_raw, 1)
+        extracted = int(random.randrange(1, 3))
+        if extracted > 1.5:
+            images, mask = self._brightness(images, masks)
+            images, mask = self._contrast(images, masks)
         images, masks = self._resize_data(images, masks)
         images, masks = self._normalize(images, masks)
         masks = tf.cast(masks, tf.int32)
@@ -53,26 +59,39 @@ class DataLoader(object):
         masks = tf.image.random_flip_left_right(masks, seed=seed)
         return images, masks
 
-    @staticmethod
-    def _brightness(images, masks):
-        seed = random.random()
-        # max_delta = float(random.randrange(1, 4)) / 10
-        images = tf.image.random_brightness(images, max_delta=0.2, seed=seed)
-        return images, masks
 
-    @staticmethod
-    def _saturation(images, masks):
-        seed = random.random()
+    def _brightness(self, images, masks):
+        #images = tf.image.adjust_brightness(images, float(random.randrange(3, 5))/10)
+        delta = float(random.randrange(0, 5))/10
+        seed = random.seed()
+        img = tf.image.adjust_brightness(images, delta)
+        return img, masks
+
+
+    def _saturation(self, images, masks):
         # upper = float(random.randrange(1, 4)) / 10
-        images = tf.image.random_saturation(images, lower=1, upper=2.5, seed=seed)
+        images = tf.image.random_saturation(images, lower=2, upper=4)
         return images, masks
 
     @staticmethod
     def _contrast(images, masks):
+        # upper = float(random.randrange(1, 4)) / 10
+        lower = 15
+        upper = 25
+        # images = tf.image.adjust_contrast(images, float(random.randrange(lower, upper))/10)
+        upper = float(random.randrange(0, 35))/10
+        seed = random.seed()
+        img = tf.image.random_contrast(images,lower=1, upper=3.5, seed=seed)
+        return img, masks
+
+    @staticmethod
+    def _hue(images, masks):
         seed = random.random()
         # upper = float(random.randrange(1, 4)) / 10
-        images = tf.image.random_contrast(images, lower=1, upper=2.5, seed=seed)
+        images = tf.image.random_hue(images, max_delta=0.02, seed=seed)
         return images, masks
+
+
 
     @staticmethod
     def _normalize(images, masks):
@@ -111,17 +130,18 @@ class DataLoader(object):
             self.channels = [image_features['depth'], 1]
         # Parse images and labels
         data = raw_image_dataset.map(self._tf_records_parser, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-        if augmentation:
-            data = data.map(self._flip, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-            data = data.map(self._contrast, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-            data = data.map(self._brightness, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-            data = data.map(self._saturation, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+        # data = data.map(self._brightness)
+        # data = data.map(self._contrast)
+        # if augmentation:
 
+            #data = data.map(self._flip, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+            #data = data.map(self._brightness)
+            #data = data.map(self._contrast)
+            #data = data.map(self._saturation, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+            #data = data.map(self._hue, num_parallel_calls=tf.data.experimental.AUTOTUNE)
         if shuffle:
             data = data.shuffle(shuffle)
         data = data.batch(batch_size, drop_remainder=True) # .repeat()
-        if augmentation:
-            data.repeat(2)
         data = data.prefetch(tf.data.experimental.AUTOTUNE)
         return data
 

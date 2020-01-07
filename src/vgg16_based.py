@@ -88,7 +88,9 @@ class Decoder(tf.keras.Model):
                                       kernel_initializer='he_normal',dilation_rate=4)
         self.dil_conv_4 = Conv2DLayer(filters=64, kernel_size=3, strides=1, padding="same", activation='relu',
                                       kernel_initializer='he_normal')
-        if skips:
+        self.skips = skips
+
+        if self.skips:
             self.up_1 = SkipConnection()
         else:
             self.up_1 = tf.keras.layers.UpSampling2D(size=(2, 2))
@@ -109,14 +111,17 @@ class Decoder(tf.keras.Model):
         x = self.dil_conv_2(x, training=training)
         x = self.dil_conv_3(x, training=training)
         x = self.dil_conv_4(x, training=training)
-        x = self.up_1(x, skip_connections[0])
+        if self.skips:
+            x = self.up_1(x, skip_connections[0])
+        else:
+            x = self.up_1(x)
         x = self.conv_4(x, training=training)
         x = self.final_conv(x)
 
         return x
 
 
-class DeepDecoder:
+class DeepDecoder(tf.keras.Model):
 
     def __init__(self, skips=True):
         super(DeepDecoder, self).__init__(name='Decoder')

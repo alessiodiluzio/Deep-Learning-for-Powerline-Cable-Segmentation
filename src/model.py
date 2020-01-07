@@ -3,10 +3,12 @@ from .unet import UEncoder, UDecoder
 from .vgg16_based import Encoder, Decoder, DeepDecoder
 from .metrics import precision_recall, compute_accuracy, compute_f1score
 from .utils import read_pixel_frequency
-from .utils import  plot, save_validation, create_folder_and_save_path, save_test
+from .utils import  plot, save_validation, create_folder_and_save_path, save_test, create_label_mask
+from .postprocess import temp_filter
 from IPython.display import clear_output
 import os
-
+from PIL import Image
+import numpy as np
 
 class CableModel(tf.keras.Model):
 
@@ -80,16 +82,6 @@ class CableModel(tf.keras.Model):
             weighted_loss = tf.reduce_mean(cross_entropy * weights)
             return weighted_loss
         return cross_entropy
-
-    def class_balanced_loss(self, image, one_hot_label, training=True):
-        beta = self.BLACK_PERCENTUAL
-        logits = self.forward(image, training=training)
-        logits = tf.nn.sigmoid(logits)
-        one_prob = one_hot_label * logits
-        zero_prob = -1*(one_hot_label - 1) * (1 - logits)
-        one_prob = tf.where(tf.equal(one_prob, 0), tf.ones_like(one_prob), one_prob)
-        zero_prob = tf.where(tf.equal(zero_prob, 0), tf.ones_like(zero_prob), zero_prob)
-        return (- 1.0/beta * tf.math.reduce_sum(tf.math.log(one_prob)) - 1.0/(1 - beta) * tf.math.reduce_sum(tf.math.log(zero_prob)))/float(image.shape[1]*image.shape[2])
 
     def backward(self, image, one_hot_label):
         with tf.device(self.device):
@@ -205,6 +197,7 @@ class CableModel(tf.keras.Model):
 
         plot(plot_path, self.name, self.history, epochs)
 
+
     def test(self, test_dataset, steps):
         if tf.executing_eagerly() is False:
             raise RuntimeError("evaluate method must be run only with eager execution.")
@@ -214,11 +207,33 @@ class CableModel(tf.keras.Model):
         count = 0
         for b, (image) in enumerate(test_dataset):
             logits = self.forward(image, training=False)
-            for img, lgt in zip(image, logits):
-                save_test(img, lgt, save_path, count)
-                count += 1
             progbar.update(b + 1)
+            for logit in logits:
+                lgt = create_label_mask(logit)
+                prediction = (tf.keras.preprocessing.image.array_to_img(lgt))
+                prediction.save(os.path.join(save_path,"test_"+str(count)+'.png'))
+                count = count + 1
 
+    def test_with_filter(self, test_dataset, steps):
+        window = 30
+        batch = []
+        if tf.executing_eagerly() is False:
+            raise RuntimeError("evaluate method must be run only with eager execution.")
+        self.load_variables()
+        progbar = tf.keras.utils.Progbar(steps)
+        save_path = create_folder_and_save_path('file/test/', self.name, split=False)
+        count = 0
+        for b, (image) in enumerate(test_dataset):
+            logits = self.forward(image, training=False)
+            progbar.update(b + 1)
+            for logit in logits:
+                lgt = create_label_mask(logit)
+                if len(batch) == window :
+                    mean = temp_filter(batch)
+                    filtered = (tf.keras.preprocessing.image.array_to_img(lgt))
+                    filtered.save(os.path.join(save_path, "filtered_"+str(count)+'.png'))
+                    count = count + 1
+                    batch = batch[1:]
 
     def evaluate(self, test_dataset, steps):
         if tf.executing_eagerly() is False:
