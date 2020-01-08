@@ -30,7 +30,7 @@ def get_images(path_list, perc=1):
         for r, d, images in os.walk(path):
             tot = int(perc * len(images))
             saved = 0
-            random.shuffle(images)
+            #random.shuffle(images)
             for img in images:
                 saved += 1
                 array.append(os.path.join(r, img))

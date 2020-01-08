@@ -11,7 +11,7 @@ def main(_):
     print(tf.test.is_gpu_available())
     if tf.test.is_gpu_available(cuda_only=True):
         device = 'gpu:0'
-    net = CableModel('Unet', device, "checkpoint/150_epoch_unet_2")
+    net = CableModel('Unet', device, "checkpoint")
 
     test_batch_size = 1
 
