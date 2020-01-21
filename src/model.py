@@ -6,9 +6,11 @@ from .utils import read_pixel_frequency
 from .utils import  plot, save_validation, create_folder_and_save_path, save_test, create_label_mask
 from .postprocess import temp_filter
 from IPython.display import clear_output
+from .dilated_convolution import FrontEnd, ContextModule
 import os
 from PIL import Image
 import numpy as np
+
 
 class CableModel(tf.keras.Model):
 
@@ -32,6 +34,9 @@ class CableModel(tf.keras.Model):
         elif name == 'Vgg16DeepNoSkip':
             self.encoder = Encoder()
             self.decoder = DeepDecoder(skips=False)
+        elif name == 'SimpleVgg16':
+            self.encoder = FrontEnd()
+            self.decoder = ContextModule('basic', 128)
         else:
             raise ValueError("UNKNOWN NET NAME")
         self.history = {}
@@ -77,12 +82,10 @@ class CableModel(tf.keras.Model):
         perc = 0
         count = 0
         for label in one_hot_label:
-            print(label)
             non_zero = tf.math.count_nonzero(label, dtype=tf.float32)
             perc = float(non_zero/(label.shape[0]*label.shape[1]))
             count += 1
         perc = float(perc/count)
-        print("Non Zero : {0} Zero : {1} ".format(perc, 1.0 - perc))
         return perc, 1.0 - perc
 
     def compute_cross_entropy(self, image, one_hot_label, training=True):
@@ -151,7 +154,7 @@ class CableModel(tf.keras.Model):
                 mask = tf.squeeze(mask, axis=-1)
                 one_hot_labels = tf.one_hot(indices=mask, depth=2, dtype=tf.float32)
                 mask = tf.cast(mask, tf.float32)
-                self.WHITE_PERCENTUAL, self.BLACK_PERCENTUAL = self.pixel_percentual(mask)
+                #self.WHITE_PERCENTUAL, self.BLACK_PERCENTUAL = self.pixel_percentual(mask)
                 loss, grads = self.backward(image, one_hot_labels)
                 optimizer.apply_gradients(grads, global_step)
                 logits = self.forward(image, training=False)

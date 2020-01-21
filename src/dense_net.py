@@ -37,23 +37,33 @@ class DenseBlock(tf.keras.Model):
     def __call__(self, input_tensor, training=False):
         input = input_tensor
         output_list = []
+        #print("Block start")
+        #print("Block input shape {0}".format(input.shape))
         for layer in self.dense_layers[:-1]:
+            #print("Input shape of Layer  {0}".format(input.shape))
             output = layer(input)
             if not isinstance(input, list):
                 input = [input]
+
             if not isinstance(output, list):
                 output = [output]
             output_list.append(output)
             maps = input + output
             input = self.concatenate(maps)
+            #print("Output shape of Layer  {0}".format(output[0].shape))
+
+        #print("Input shape of Last layer {0}".format(input.shape))
         output = self.dense_layers[-1](input, training=training)
+        #print("Output shape of Last layer {0}".format(output.shape))
         if not isinstance(output, list):
             output = [output]
         output_list.append(output)
         maps = output_list[0]
         for out in output_list[1:]:
             maps += out
-        return self.concatenate(maps)
+        final_output = self.concatenate(maps)
+        #print("Block output shape = {0}".format(final_output.shape))
+        return final_output
 
 
 class TransitionDown(tf.keras.Model):
@@ -153,6 +163,8 @@ class DenseNet(tf.keras.Model):
                                             self.dense_block_9,
                                             self.dense_block_10]
 
+        #[self.transition_up_1,self.transition_up_2,
+
         self.upsampling_path_transition_up = [self.transition_up_1,
                                               self.transition_up_2,
                                               self.transition_up_3,
@@ -192,31 +204,36 @@ class DenseNet(tf.keras.Model):
         input_tensor = image
 
         # ENCODER
-
+        print("ENCODER START")
+        print("Encoder input shape = {0}".format(input_tensor.shape))
         block_input = self.first_convolution(input_tensor)
         for i in range(len(self.downsampling_path_dense_block)):
+            print("Block {0} input shape = {1}".format(i, block_input.shape))
             block_output = self.downsampling_path_dense_block[i](block_input, training=training)
+
             if not isinstance(block_input, list):
                 block_input = [block_input]
             if not isinstance(block_output, list):
                 block_output = [block_output]
             block_output = self.concatenate(block_input + block_output)
+            print("Block {0} output shape = {1}".format(i, block_output.shape))
             self.skip_maps.append(block_output)
             block_input = self.downsampling_path_transition_down[i](block_output, training=training)
 
         # BOTTLENECK
-
+        print("BOTTLENECK")
+        print("Bottleneck input shape = {0}".format(block_input.shape))
         block_output = self.bottleneck(block_input)
+        print("Bottleneck output shape = {0}".format(block_output.shape))
         block_input = block_output
 
         # DECODER
-
+        print("DECODER")
         for i in range(len(self.upsampling_path_dense_block)):
+            print("Block {0} input shape = {1}".format(i, block_input.shape))
             block_output = self.upsampling_path_transition_up[i](block_input)
-            #block_input = block_output
-            #if not isinstance(block_output, list):
-            #    block_output = [block_output]
             block_output = self.concatenate([self.skip_maps[-1 - i]] + [block_output])
+            print("Block {0} output shape = {1}".format(i, block_output.shape))
             block_input = self.upsampling_path_dense_block[i](block_output, training=training)
 
         return self.last_convolution(block_input)

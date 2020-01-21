@@ -18,8 +18,10 @@ class DataLoader(object):
         self.tf_records_path = tf_records_path
         self.palette = palette
         self.image_size = image_size
-        self.channels = []
-        self.image_feature_description = {
+
+    @staticmethod
+    def _tf_records_parser(example):
+        image_feature_description = {
             'height': tf.io.FixedLenFeature([], tf.int64),
             'width': tf.io.FixedLenFeature([], tf.int64),
             'depth': tf.io.FixedLenFeature([], tf.int64),
@@ -27,89 +29,55 @@ class DataLoader(object):
             'mask_raw': tf.io.FixedLenFeature([], tf.string),
 
         }
-
-    def _tf_records_parser(self, example):
-
-        image_features = tf.io.parse_single_example(example, self.image_feature_description)
+        image_features = tf.io.parse_single_example(example, image_feature_description)
         image_raw = image_features['image_raw']
-        images = tf.io.decode_png(image_raw, channels=self.channels[0])
+        images = tf.io.decode_png(image_raw, channels=3)
         mask_raw = image_features['mask_raw']
         masks = tf.io.decode_png(mask_raw, 1)
-        extracted = int(random.randrange(1, 3))
-        if extracted > 1.5:
-            images, mask = self._brightness(images, masks)
-            images, mask = self._contrast(images, masks)
-        images, masks = self._resize_data(images, masks)
-        images, masks = self._normalize(images, masks)
-        masks = tf.cast(masks, tf.int32)
         return images, masks
 
-    def _resize_data(self, images, masks):
+    @staticmethod
+    def _resize_data(images, masks):
         """
         Resizes images to specified size.
         """
-        images = tf.image.resize(images, [self.image_size[0][0], self.image_size[0][1]])
-        masks = tf.image.resize(masks, [self.image_size[1][0], self.image_size[1][1]], method='nearest')
+        images = tf.image.resize(images, [128, 128])
+        masks = tf.image.resize(masks, [128, 128])
         return images, masks
 
-    @staticmethod
-    def _flip(images, masks):
+    def _luminosity(self, images, masks):
         seed = random.random()
-        images = tf.image.random_flip_left_right(images, seed=seed)
-        masks = tf.image.random_flip_left_right(masks, seed=seed)
+        images = tf.image.random_brightness(images, max_delta=0.5)
+        images = tf.image.random_contrast(images, lower=1, upper=3.5)
         return images, masks
-
-
-    def _brightness(self, images, masks):
-        #images = tf.image.adjust_brightness(images, float(random.randrange(3, 5))/10)
-        delta = float(random.randrange(0, 5))/10
-        seed = random.seed()
-        img = tf.image.adjust_brightness(images, delta)
-        return img, masks
-
-
-    def _saturation(self, images, masks):
-        # upper = float(random.randrange(1, 4)) / 10
-        images = tf.image.random_saturation(images, lower=2, upper=4)
-        return images, masks
-
-    @staticmethod
-    def _contrast(images, masks):
-        # upper = float(random.randrange(1, 4)) / 10
-        lower = 15
-        upper = 25
-        # images = tf.image.adjust_contrast(images, float(random.randrange(lower, upper))/10)
-        upper = float(random.randrange(0, 35))/10
-        seed = random.seed()
-        img = tf.image.random_contrast(images,lower=1, upper=3.5, seed=seed)
-        return img, masks
-
-    @staticmethod
-    def _hue(images, masks):
-        seed = random.random()
-        # upper = float(random.randrange(1, 4)) / 10
-        images = tf.image.random_hue(images, max_delta=0.02, seed=seed)
-        return images, masks
-
-
 
     @staticmethod
     def _normalize(images, masks):
         images = tf.cast(images, tf.float32) / 255.0
         masks = tf.cast(masks, tf.float32) / 255.0
+        masks = tf.cast(masks, tf.int32)
         return images, masks
-
 
     def data_all(self):
         raw_image_dataset = tf.data.TFRecordDataset(self.tf_records_path)
         for example in raw_image_dataset:
             image_features = tf.io.parse_single_example(example, self.image_feature_description)
-            self.channels = [image_features['depth'], 1]
         # Parse images and labels
-        data = raw_image_dataset.map(self._tf_records_parser, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+        data = raw_image_dataset.map(self._tf_records_parser)
         return data
 
-    def data_batch(self, batch_size, shuffle=False, augmentation=False):
+    def validation_batch(self, val_batch_size):
+        raw_image_dataset = tf.data.TFRecordDataset(self.tf_records_path)
+        # Parse images and labels
+        data = raw_image_dataset.map(self._tf_records_parser)
+        data = data.map(self._resize_data)
+        data = data.map(self._normalize)
+        data = data.batch(val_batch_size, drop_remainder=True)
+        data = data.prefetch(tf.data.experimental.AUTOTUNE)
+        return data
+
+
+    def train_batch(self, batch_size, shuffle=False, augmentation=False):
         """
         Reads data, normalizes it, shuffles it, then batches it, returns a
         the next element in dataset op and the dataset initializer op.
@@ -125,23 +93,15 @@ class DataLoader(object):
         """
 
         raw_image_dataset = tf.data.TFRecordDataset(self.tf_records_path)
-        for example in raw_image_dataset:
-            image_features = tf.io.parse_single_example(example, self.image_feature_description)
-            self.channels = [image_features['depth'], 1]
         # Parse images and labels
-        data = raw_image_dataset.map(self._tf_records_parser, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-        # data = data.map(self._brightness)
-        # data = data.map(self._contrast)
-        # if augmentation:
-
-            #data = data.map(self._flip, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-            #data = data.map(self._brightness)
-            #data = data.map(self._contrast)
-            #data = data.map(self._saturation, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-            #data = data.map(self._hue, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+        data = raw_image_dataset.map(self._tf_records_parser)
+        if augmentation:
+            data = data.map(self._luminosity)
+        data = data.map(self._resize_data)
+        data = data.map(self._normalize)
         if shuffle:
             data = data.shuffle(shuffle)
-        data = data.batch(batch_size, drop_remainder=True) # .repeat()
+        data = data.batch(batch_size, drop_remainder=True)
         data = data.prefetch(tf.data.experimental.AUTOTUNE)
         return data
 
@@ -185,8 +145,8 @@ class TestDataLoader(object):
         images = tf.image.resize(images, [self.image_size[0][0], self.image_size[0][1]])
         return images
 
-    @staticmethod
-    def _normalize(images):
+
+    def _normalize(self, images):
         images = tf.cast(images, tf.float32) / 255.0
         return images
 
